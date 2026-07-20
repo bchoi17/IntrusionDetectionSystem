@@ -1,11 +1,11 @@
 """
-XGBoost_model.py
+train_binary_model.py
 
-This script trains a binary Intrusion Detecction System (IDS) model
+This script trains a binary Intrusion Detection System (IDS) model
 
-The model trained is a binary Random Forest classification model within a Pipeline. It is used to predict whether a
-traffic flow is normal or an attack based on the traffic features given in the datasets. However, if the network flow
-is an attack, the model cannot specify the type of attack.
+The model trained is a binary Random Forest classification model within a Pipeline. This model is used to predict
+whether a traffic flow is normal or an attack based on the traffic features given in the datasets. However, if the
+network flow is an attack, the model cannot specify the type of attack.
 
 Datasets used:
 - Dataset.csv contains the network-flow features
@@ -30,7 +30,12 @@ from sklearn.metrics import (
     classification_report, confusion_matrix,
 )
 
-# Loads data and checks if both datasets have the same number of rows
+"""
+Function is used to load the two datasets the model need to train/test
+
+- Checks if the two datasets has the same number of rows 
+- Shows the distribution of that attack and normal label distribution
+"""
 def load_data(dataset_path, label_path):
     X = pd.read_csv(dataset_path)
     y_raw = pd.read_csv(label_path)
@@ -51,7 +56,7 @@ def load_data(dataset_path, label_path):
     # 1-9 = Attack
     y_binary = (y_multiclass != 0).astype(int)
 
-    # Shows the orginal distribution of all attacks and normal flow
+    # Shows the original distribution of all attacks and normal flow
     print("\n Original label distribution:")
     print(y_multiclass.value_counts().sort_index())
 
@@ -61,42 +66,59 @@ def load_data(dataset_path, label_path):
 
     return X, y_binary, y_multiclass
 
-# Cleans data before in use
+"""
+Cleans dataset before in use
+
+- If Dataset.csv has a column named "Label", it will be removed from the dataset
+- If any data is missing in Dataset.csv, the missing data wil be filled with the column median of the data
+"""
 def clean_features(X):
     X = X.copy()
 
-    # Replace infinite values if in dataset
+    # Removes the "Label" column in Dataset.csv is there is any.
     if "Label" in X.columns:
         X = X.drop(columns=["Label"])
 
-    # Fill missing values with column median
+    # Replace missing numeric values with the median of their feature column.
     X = X.fillna(X.median(numeric_only=True))
 
     return X
 
-# Builds the pipeline to build the Random Forest Classifier
+"""
+Builds the pipeline to build the Random Forest Classifier model
+
+- StandardScaler(): Standardize dataset to center mean as 0 and standard deviation as 1
+- SMOTE(): Fixes imbalance in the dataset
+- RandomForestClassifier: The Random Forest Classifier model
+"""
 def build_model():
     model = Pipeline(
         steps=[
             ("scaler", StandardScaler()),
             ("oversampling", SMOTE(random_state=42, n_jobs=-1)),
             ("classifier", RandomForestClassifier(
-                n_estimators=200,
-                class_weight="balanced",
-                random_state=42,
-                n_jobs=-1,
+                n_estimators=200, # 200 decision trees used
+                class_weight="balanced", # handles imbalance in dataset adjusting to penalizing misclassifications
+                random_state=42, # model uses same number of rows for identical predicitons
+                n_jobs=-1, # uses all but a few CPU cores to run the model
             ))
         ]
     )
     return model
 
-# Evaluates the trained model based on Accuracy, Balanced Accuracy, Precision, Recall and F1 Score
-# Also gives the Confusion Matrix and the Classification Report
+"""
+Evaluates the trained model based on 
+- Accuracy
+- Balanced Accuracy
+- Precision
+- Recall
+- F1-Score
+- Confusion Matrix
+"""
 def evaluate_model(model, X_test, y_test):
     y_pred = model.predict(X_test)
 
-    # Shows the Accuracy, Balanced Accuracy, Precision, Recall, F1 Score, Confusion Matrix, and
-    # Classification Report
+    # Shows the Accuracy, Balanced Accuracy, Precision, Recall, F1 Score, Confusion Matrix, and Classification Report
     print("\n Accuracy:", accuracy_score(y_test, y_pred))
     print("\n Balanced Accuracy:", balanced_accuracy_score(y_test, y_pred))
     print("\n Precision:", precision_score(y_test, y_pred))
@@ -113,11 +135,11 @@ def main():
     dataset_path = "Dataset.csv"
     label_path = "Label.csv"
 
-    # Loads the dataset and cleans the data
+    # Loads and cleans the dataset
     X, y_binary, y_multiclass = load_data(dataset_path, label_path)
     X = clean_features(X)
 
-    # Train and test the data
+    # Trains and tests the data
     X_train, X_test, y_train, y_test = train_test_split(
 X,
         y_binary,
@@ -126,7 +148,7 @@ X,
         stratify=y_binary
     )
 
-    # Shows the number of training and testing rows
+    # Shows the number of rows in trained/tested dataset
     print("\nTraining rows:", X_train.shape[0])
     print("\nTesting rows:", X_test.shape[0])
 
@@ -145,7 +167,7 @@ X,
     os.makedirs("models", exist_ok=True)
     joblib.dump(model, "models/random_forest_binary_ids.pkl")
 
-    # Save the feature names separately for reature importance and SHAP later
+    # Save the feature names separately for feature importance and SHAP later
     joblib.dump(list(X.columns), "models/feature_names.pkl")
 
     # Confirms that the script ran completely
